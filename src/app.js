@@ -41,12 +41,25 @@ function init() {
 
     const dirLight = new THREE.DirectionalLight( 0xffffff, 3 );
     dirLight.position.set( 0, 20, 10 );
+    dirLight.castShadow = true;
+    
+    // Configure shadow map
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 10;
+    dirLight.shadow.camera.far = 100;
+    dirLight.shadow.camera.left = -50;
+    dirLight.shadow.camera.right = 50;
+    dirLight.shadow.camera.top = 50;
+    dirLight.shadow.camera.bottom = -50;
+    
     scene.add( dirLight );
 
     // ground
 
     const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 2000, 2000 ), new THREE.MeshPhongMaterial( { color: 0xcbcbcb, depthWrite: false } ) );
     mesh.rotation.x = - Math.PI / 2;
+    mesh.receiveShadow = true; // Ground receives shadows
     scene.add( mesh );
 
     const grid = new THREE.GridHelper( 200, 40, 0x000000, 0x000000 );
@@ -60,6 +73,15 @@ function init() {
     loader.load( 'models/gltf/RobotExpressive/RobotExpressive.glb', function ( gltf ) {
 
         model = gltf.scene;
+        
+        // Enable shadows for the robot model
+        model.traverse( function ( child ) {
+            if ( child.isMesh ) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        } );
+        
         scene.add( model );
 
         createGUI( model, gltf.animations );
@@ -74,6 +96,11 @@ function init() {
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize( window.innerWidth, window.innerHeight );
     renderer.setAnimationLoop( animate );
+    
+    // Enable shadow maps
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows
+    
     container.appendChild( renderer.domElement );
 
     window.addEventListener( 'resize', onWindowResize );
@@ -103,13 +130,13 @@ function setupTimer() {
                 face.morphTargetInfluences[randomIndex] = randomValue;
                 console.log(`Timer update at ${new Date().toLocaleTimeString()} - Robot expression changed: ${expressionName} = ${randomValue.toFixed(2)}`);
             } 
-            if (randomChoice < 0.4) {
+            if (randomChoice < 0.3) {
                 // 20% chance for emote (0.2 to 0.4)
                 const randomIndex = Math.floor(Math.random() * emotes.length);
                 const newEmote = emotes[randomIndex];
                 
                 if (actions && actions[newEmote]) {
-                    fadeToAction(newEmote, 0.2);
+                    fadeToAction(newEmote, 0.);
                     console.log(`Timer update at ${new Date().toLocaleTimeString()} - Robot randomly performed emote: ${newEmote}`);
                 }
             } else {
@@ -131,8 +158,8 @@ function setupTimer() {
 
 function createGUI( model, animations ) {
 
-    states = [ 'Idle', 'Walking', 'Running', 'Dance', '_Death', '_Sitting', 'Standing' ];
-    emotes = [ 'Jump', 'Yes', 'No', 'Wave', 'Punch', 'ThumbsUp' ];
+    states = [ 'Idle', 'Walking', ]; // 'Death', 'Sitting', 'Standing', 'Running', 'Dance', 
+    emotes = [ 'Yes', 'No', 'Wave', 'Punch', 'ThumbsUp' ]; // 'Jump'
 
     gui = new GUI();
 
