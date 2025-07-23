@@ -207,6 +207,55 @@ function sendMessage() {
 }
 
 /**
+ * Simple markdown renderer for chat messages
+ * @param {string} text - The markdown text to render
+ * @returns {string} HTML string
+ */
+function renderMarkdown(text) {
+    let html = text;
+    
+    // Escape HTML characters first to prevent XSS
+    html = html.replace(/&/g, '&amp;')
+               .replace(/</g, '&lt;')
+               .replace(/>/g, '&gt;');
+    
+    // Bold text: **text** or __text__
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+    
+    // Italic text: *text* or _text_
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+    
+    // Code inline: `code`
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Code blocks: ```code```
+    html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    
+    // Headers: # ## ###
+    html = html.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+    
+    // Links: [text](url)
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    
+    // Line breaks: Convert \n to <br> but not inside code blocks
+    html = html.replace(/\n(?![^<]*<\/(?:pre|code)>)/g, '<br>');
+    
+    // Lists: - item or * item
+    html = html.replace(/^[\s]*[-*+]\s+(.*)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    
+    // Numbered lists: 1. item
+    html = html.replace(/^[\s]*\d+\.\s+(.*)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/s, '<ol>$1</ol>');
+    
+    return html;
+}
+
+/**
  * Add a message to the chat
  * @param {string} text - The message text
  * @param {string} sender - The sender type ('user', 'robot', 'system')
@@ -215,7 +264,13 @@ function sendMessage() {
 function addMessage(text, sender) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${sender}-message`;
-    messageDiv.textContent = text;
+    
+    // Render markdown for robot messages, plain text for others
+    if (sender === 'robot') {
+        messageDiv.innerHTML = renderMarkdown(text);
+    } else {
+        messageDiv.textContent = text;
+    }
     
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;

@@ -69,6 +69,9 @@ function updateVoiceSelector() {
         const shortName = robotVoice.name.replace(/^(Microsoft|Google|Apple)\s*/, '').substring(0, 20);
         voiceButton.title = `Current voice: ${robotVoice.name}`;
         
+        // Set button text to show current voice info
+        voiceButton.textContent = '🎭';
+        
         // Update voice dropdown selection if it's open
         const voiceItems = document.querySelectorAll('.voice-item');
         voiceItems.forEach(item => {
@@ -78,6 +81,10 @@ function updateVoiceSelector() {
                 item.classList.add('selected');
             }
         });
+    } else if (voiceButton) {
+        // Fallback when no voice is selected
+        voiceButton.textContent = '🎭';
+        voiceButton.title = 'Select Voice';
     }
 }
 
@@ -477,6 +484,12 @@ function setupAudioEventListeners() {
     const speechToggle = document.getElementById('speechToggle');
     const micButton = document.getElementById('micButton');
     const voiceButton = document.getElementById('voiceButton');
+    
+    // Initialize voice button appearance
+    if (voiceButton) {
+        voiceButton.textContent = '🎭';
+        voiceButton.title = 'Select Voice';
+    }
     
     // Speech toggle event listener
     if (speechToggle) {

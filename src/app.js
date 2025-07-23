@@ -45,7 +45,7 @@ import {
 let container, stats, clock, gui, mixer, actions, activeAction, previousAction;
 let camera, scene, renderer, model, face;
 
-const api = { state: 'Idle', robotColor: '#ffffff' };
+const api = { state: 'Idle', robotColor: '#f5a824' };
 
 // Timer variables
 let timerCallback;
