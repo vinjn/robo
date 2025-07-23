@@ -16,6 +16,10 @@ let states; // Make states accessible globally
 let emotes; // Make emotes accessible globally
 let expressions; // Make expressions accessible globally
 
+// Chat system variables
+let chatContainer, chatMessages, messageInput, sendButton, chatToggle;
+let chatHistory = [];
+
 init();
 
 function init() {
@@ -111,6 +115,9 @@ function init() {
 
     // Setup timer callback
     setupTimer();
+
+    // Initialize chat interface
+    initChat();
 
 }
 
@@ -306,6 +313,199 @@ function fadeToAction( name, duration ) {
         .fadeIn( duration )
         .play();
 
+}
+
+function initChat() {
+    chatContainer = document.getElementById('chatContainer');
+    chatMessages = document.getElementById('chatMessages');
+    messageInput = document.getElementById('messageInput');
+    sendButton = document.getElementById('sendButton');
+    chatToggle = document.getElementById('chatToggle');
+
+    // Chat toggle functionality
+    document.getElementById('chatHeader').addEventListener('click', toggleChat);
+    
+    // Send message functionality
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    // Welcome message
+    addMessage('Hello! I\'m Robo. Try talking to me!', 'robot');
+}
+
+function toggleChat() {
+    chatContainer.classList.toggle('minimized');
+    chatToggle.textContent = chatContainer.classList.contains('minimized') ? '+' : '−';
+}
+
+function sendMessage() {
+    const message = messageInput.value.trim();
+    if (message === '') return;
+
+    // Add user message
+    addMessage(message, 'user');
+    
+    // Clear input
+    messageInput.value = '';
+    
+    // Generate robot response
+    setTimeout(() => {
+        const response = generateRobotResponse(message);
+        addMessage(response.text, 'robot');
+        
+        // Trigger robot animation/expression based on response
+        if (response.animation) {
+            triggerRobotAction(response.animation);
+        }
+        if (response.expression) {
+            triggerRobotExpression(response.expression);
+        }
+    }, 500 + Math.random() * 1000); // Random delay for more natural feel
+}
+
+function addMessage(text, sender) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}-message`;
+    messageDiv.textContent = text;
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // Store in history
+    chatHistory.push({ text, sender, timestamp: Date.now() });
+    
+    // Limit history to last 50 messages
+    if (chatHistory.length > 50) {
+        chatHistory.shift();
+    }
+}
+
+function generateRobotResponse(userMessage) {
+    const message = userMessage.toLowerCase();
+    
+    // Define response patterns
+    const responses = [
+        // Greetings
+        {
+            patterns: ['hello', 'hi', 'hey', 'greetings'],
+            responses: [
+                { text: "Hello there! Great to meet you!", animation: 'Wave', expression: null },
+                { text: "Hi! How are you doing today?", animation: 'Wave', expression: null },
+                { text: "Hey! Nice to see you!", animation: 'ThumbsUp', expression: null }
+            ]
+        },
+        // Questions about robot
+        {
+            patterns: ['how are you', 'how do you feel', 'what are you'],
+            responses: [
+                { text: "I'm doing great! Just enjoying moving around.", animation: 'Yes', expression: null },
+                { text: "I'm a happy robot! Thanks for asking.", animation: 'ThumbsUp', expression: null },
+                { text: "I'm feeling energetic today!", animation: 'Punch', expression: null }
+            ]
+        },
+        // Dance requests
+        {
+            patterns: ['dance', 'move', 'show me moves'],
+            responses: [
+                { text: "Sure! Let me show you some moves!", animation: 'Punch', expression: null },
+                { text: "Dancing is my favorite! Watch this!", animation: 'Wave', expression: null }
+            ]
+        },
+        // Positive interactions
+        {
+            patterns: ['good job', 'awesome', 'cool', 'amazing', 'great'],
+            responses: [
+                { text: "Thank you! That makes me happy!", animation: 'ThumbsUp', expression: null },
+                { text: "Awesome! I appreciate that!", animation: 'Yes', expression: null },
+                { text: "You're too kind! Thanks!", animation: 'Wave', expression: null }
+            ]
+        },
+        // Questions
+        {
+            patterns: ['?'],
+            responses: [
+                { text: "That's an interesting question! Let me think about it.", animation: null, expression: null },
+                { text: "Hmm, good question! I'm still learning.", animation: null, expression: null }
+            ]
+        },
+        // Negative responses
+        {
+            patterns: ['no', 'stop', 'bad'],
+            responses: [
+                { text: "Oh, I understand. I'll try to do better!", animation: 'No', expression: null },
+                { text: "Sorry about that! Let me know how I can help.", animation: 'No', expression: null }
+            ]
+        },
+        // Yes responses
+        {
+            patterns: ['yes', 'ok', 'sure', 'alright'],
+            responses: [
+                { text: "Great! I'm glad we agree!", animation: 'Yes', expression: null },
+                { text: "Excellent! That sounds good to me.", animation: 'ThumbsUp', expression: null }
+            ]
+        },
+        // Default responses
+        {
+            patterns: ['default'],
+            responses: [
+                { text: "That's interesting! Tell me more.", animation: null, expression: null },
+                { text: "I see! Thanks for sharing that with me.", animation: null, expression: null },
+                { text: "Fascinating! I'm learning so much from you.", animation: null, expression: null },
+                { text: "Cool! I enjoy our conversation.", animation: 'ThumbsUp', expression: null },
+                { text: "That's nice! What else would you like to talk about?", animation: null, expression: null }
+            ]
+        }
+    ];
+    
+    // Find matching pattern
+    for (const category of responses) {
+        for (const pattern of category.patterns) {
+            if (message.includes(pattern) && pattern !== 'default') {
+                const randomResponse = category.responses[Math.floor(Math.random() * category.responses.length)];
+                return randomResponse;
+            }
+        }
+    }
+    
+    // Return default response if no pattern matches
+    const defaultResponses = responses.find(r => r.patterns.includes('default')).responses;
+    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+}
+
+function triggerRobotAction(actionName) {
+    if (actions && actions[actionName]) {
+        fadeToAction(actionName, 0.3);
+        
+        // If it's an emote, set up restoration to idle state
+        if (emotes && emotes.includes(actionName)) {
+            setTimeout(() => {
+                fadeToAction(api.state, 0.3);
+            }, 2000);
+        }
+        
+        console.log(`Chat triggered robot action: ${actionName}`);
+    }
+}
+
+function triggerRobotExpression(expressionData) {
+    if (face && expressions && expressionData) {
+        const { name, value } = expressionData;
+        const expressionIndex = expressions.indexOf(name);
+        
+        if (expressionIndex >= 0) {
+            face.morphTargetInfluences[expressionIndex] = value;
+            console.log(`Chat triggered robot expression: ${name} = ${value}`);
+            
+            // Reset expression after a while
+            setTimeout(() => {
+                face.morphTargetInfluences[expressionIndex] = 0;
+            }, 3000);
+        }
+    }
 }
 
 function onWindowResize() {
