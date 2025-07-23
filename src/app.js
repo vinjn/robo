@@ -20,6 +20,12 @@ let expressions; // Make expressions accessible globally
 let chatContainer, chatMessages, messageInput, sendButton, chatToggle;
 let chatHistory = [];
 
+// Speech synthesis variables
+let speechSynthesis = window.speechSynthesis;
+let robotVoice = null;
+let isSpeechEnabled = true;
+let speechInitialized = false;
+
 init();
 
 function init() {
@@ -321,20 +327,203 @@ function initChat() {
     messageInput = document.getElementById('messageInput');
     sendButton = document.getElementById('sendButton');
     chatToggle = document.getElementById('chatToggle');
+    const speechToggle = document.getElementById('speechToggle');
+
+    // Check if all elements are found
+    if (!chatContainer) console.error('chatContainer not found');
+    if (!chatMessages) console.error('chatMessages not found');
+    if (!messageInput) console.error('messageInput not found');
+    if (!sendButton) console.error('sendButton not found');
+    if (!chatToggle) console.error('chatToggle not found');
+    if (!speechToggle) console.error('speechToggle not found');
+
+    // Initialize speech synthesis
+    initSpeechSynthesis();
 
     // Chat toggle functionality
-    document.getElementById('chatHeader').addEventListener('click', toggleChat);
+    document.getElementById('chatHeader').addEventListener('click', function(e) {
+        // Don't toggle chat if clicking on buttons
+        if (e.target.id === 'chatToggle' || e.target.id === 'speechToggle') {
+            return;
+        }
+        toggleChat();
+    });
+    
+    // Individual button handlers
+    chatToggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleChat();
+    });
+    
+    speechToggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const enabled = toggleSpeech();
+        speechToggle.textContent = enabled ? '🔊' : '🔇';
+        speechToggle.title = enabled ? 'Disable Speech' : 'Enable Speech';
+        speechToggle.classList.toggle('disabled', !enabled);
+    });
     
     // Send message functionality
-    sendButton.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
+    if (sendButton) {
+        sendButton.addEventListener('click', function(e) {
+            console.log('Send button clicked');
+            e.preventDefault();
             sendMessage();
-        }
-    });
+        });
+    }
+    
+    if (messageInput) {
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                console.log('Enter key pressed');
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
 
     // Welcome message
-    addMessage('Hello! I\'m Robo. Try talking to me!', 'robot');
+    addMessage('Hello! I\'m Robo. Try talking to me! (Speech will activate after your first message)', 'robot');
+    // Don't speak automatically - wait for user interaction
+}
+
+function initSpeechSynthesis() {
+    // Wait for voices to be loaded
+    if (speechSynthesis.getVoices().length === 0) {
+        speechSynthesis.addEventListener('voiceschanged', selectRobotVoice);
+    } else {
+        selectRobotVoice();
+    }
+}
+
+function selectRobotVoice() {
+    const voices = speechSynthesis.getVoices();
+    
+    // Prefer robot-like or synthetic voices
+    const preferredVoices = [
+        'Microsoft David - English (United States)',
+        'Google UK English Male',
+        'Alex',
+        'Daniel',
+        'Microsoft Mark - English (United States)',
+        'Google US English'
+    ];
+    
+    // Try to find a preferred voice
+    for (const preferredVoice of preferredVoices) {
+        robotVoice = voices.find(voice => voice.name === preferredVoice);
+        if (robotVoice) break;
+    }
+    
+    // Fallback to any English male voice
+    if (!robotVoice) {
+        robotVoice = voices.find(voice => 
+            voice.lang.startsWith('en') && 
+            (voice.name.toLowerCase().includes('male') || voice.name.toLowerCase().includes('david') || voice.name.toLowerCase().includes('alex'))
+        );
+    }
+    
+    // Final fallback to first English voice
+    if (!robotVoice) {
+        robotVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+    }
+    
+    console.log('Selected robot voice:', robotVoice ? robotVoice.name : 'Default');
+}
+
+function speakText(text) {
+    if (!isSpeechEnabled || !text) return;
+    
+    // Initialize speech on first use (requires user interaction)
+    if (!speechInitialized) {
+        try {
+            // Test if speech synthesis is available and allowed
+            const testUtterance = new SpeechSynthesisUtterance('');
+            speechSynthesis.speak(testUtterance);
+            speechSynthesis.cancel(); // Cancel the empty utterance
+            speechInitialized = true;
+        } catch (error) {
+            console.warn('Speech synthesis not available:', error);
+            return;
+        }
+    }
+    
+    // Cancel any ongoing speech
+    speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Configure voice properties
+    if (robotVoice) {
+        utterance.voice = robotVoice;
+    }
+    
+    utterance.rate = 0.9; // Slightly slower for robot effect
+    utterance.pitch = 0.8; // Lower pitch for robot voice
+    utterance.volume = 0.8;
+    
+    // Add some robot-like pauses for longer texts
+    if (text.length > 50) {
+        utterance.rate = 0.8;
+    }
+    
+    // Error handling
+    utterance.onerror = function(event) {
+        console.error('Speech synthesis error:', event.error);
+        if (event.error === 'not-allowed') {
+            console.warn('Speech synthesis blocked. User interaction required first.');
+            isSpeechEnabled = false;
+            // Update UI to show speech is disabled
+            const speechToggle = document.getElementById('speechToggle');
+            if (speechToggle) {
+                speechToggle.textContent = '🔇';
+                speechToggle.title = 'Speech blocked - click to enable';
+                speechToggle.classList.add('disabled');
+            }
+        }
+    };
+    
+    utterance.onstart = function() {
+        console.log('Robot started speaking:', text);
+        speechInitialized = true;
+    };
+    
+    utterance.onend = function() {
+        console.log('Robot finished speaking');
+    };
+    
+    try {
+        speechSynthesis.speak(utterance);
+    } catch (error) {
+        console.error('Failed to speak:', error);
+    }
+}
+
+function toggleSpeech() {
+    isSpeechEnabled = !isSpeechEnabled;
+    
+    if (!isSpeechEnabled) {
+        speechSynthesis.cancel();
+    } else {
+        // Initialize speech synthesis when enabled
+        if (!speechInitialized) {
+            try {
+                // Test speech synthesis with user interaction
+                const testUtterance = new SpeechSynthesisUtterance('Speech enabled');
+                testUtterance.volume = 0.1; // Very quiet test
+                testUtterance.rate = 2; // Very fast
+                speechSynthesis.speak(testUtterance);
+                speechInitialized = true;
+                console.log('Speech synthesis initialized');
+            } catch (error) {
+                console.warn('Could not initialize speech synthesis:', error);
+                isSpeechEnabled = false;
+            }
+        }
+    }
+    
+    console.log('Speech synthesis', isSpeechEnabled ? 'enabled' : 'disabled');
+    return isSpeechEnabled;
 }
 
 function toggleChat() {
@@ -343,8 +532,26 @@ function toggleChat() {
 }
 
 function sendMessage() {
+    console.log('sendMessage function called');
     const message = messageInput.value.trim();
-    if (message === '') return;
+    console.log('Message value:', message);
+    if (message === '') {
+        console.log('Message is empty, returning');
+        return;
+    }
+
+    // Initialize speech synthesis on first user interaction
+    if (!speechInitialized && isSpeechEnabled) {
+        try {
+            const testUtterance = new SpeechSynthesisUtterance('');
+            speechSynthesis.speak(testUtterance);
+            speechSynthesis.cancel();
+            speechInitialized = true;
+            console.log('Speech synthesis initialized on user interaction');
+        } catch (error) {
+            console.warn('Could not initialize speech synthesis:', error);
+        }
+    }
 
     // Add user message
     addMessage(message, 'user');
@@ -356,6 +563,9 @@ function sendMessage() {
     setTimeout(() => {
         const response = generateRobotResponse(message);
         addMessage(response.text, 'robot');
+        
+        // Speak the robot's response
+        speakText(response.text);
         
         // Trigger robot animation/expression based on response
         if (response.animation) {
@@ -404,7 +614,17 @@ function generateRobotResponse(userMessage) {
             responses: [
                 { text: "I'm doing great! Just enjoying moving around.", animation: 'Yes', expression: null },
                 { text: "I'm a happy robot! Thanks for asking.", animation: 'ThumbsUp', expression: null },
-                { text: "I'm feeling energetic today!", animation: 'Punch', expression: null }
+                { text: "I'm feeling energetic today!", animation: 'Punch', expression: null },
+                { text: "I'm fantastic! Ready to chat and move around.", animation: 'Wave', expression: null }
+            ]
+        },
+        // Speech-related interactions
+        {
+            patterns: ['speak', 'talk', 'say something', 'voice'],
+            responses: [
+                { text: "I love talking! My voice makes me feel more alive.", animation: 'Yes', expression: null },
+                { text: "Speaking is one of my favorite features!", animation: 'ThumbsUp', expression: null },
+                { text: "I can speak in different tones and speeds. Pretty cool, right?", animation: 'Wave', expression: null }
             ]
         },
         // Dance requests

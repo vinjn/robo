@@ -123,7 +123,13 @@ a, button, input, select {
 	border-bottom: 1px solid #444;
 }
 
-#chatToggle {
+#chatHeader > div {
+	display: flex;
+	gap: 5px;
+	align-items: center;
+}
+
+#chatToggle, #speechToggle {
 	background: none;
 	border: none;
 	color: white;
@@ -135,6 +141,16 @@ a, button, input, select {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+#speechToggle {
+	font-size: 16px;
+	opacity: 1;
+	transition: opacity 0.3s;
+}
+
+#speechToggle.disabled {
+	opacity: 0.5;
 }
 
 #chatMessages {
