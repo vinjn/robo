@@ -40,10 +40,18 @@
 			<div id="chatHeader">
 				<span>Chat with Robot</span>
 				<div>
+					<button id="voiceButton" title="Select Voice">🎭</button>
 					<button id="speechToggle" title="Toggle Speech">🔊</button>
 					<button id="chatToggle">−</button>
 				</div>
 			</div>
+			
+			<!-- Voice Selection Dropdown -->
+			<div id="voiceDropdown" style="display: none;">
+				<div class="dropdown-header">Select Voice</div>
+				<div id="voiceList"></div>
+			</div>
+			
 			<div id="chatMessages"></div>
 			<div id="chatInput">
 				<button id="micButton" title="Voice Input">🎤</button>

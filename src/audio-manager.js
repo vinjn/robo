@@ -6,6 +6,7 @@ let speechSynthesis = window.speechSynthesis;
 let robotVoice = null;
 let isSpeechEnabled = true;
 let speechInitialized = false;
+let availableVoices = [];
 
 // Speech recognition variables
 let speechRecognition = null;
@@ -15,6 +16,104 @@ let recognitionSupported = false;
 // Callback functions for integration with main app
 let onSpeechRecognized = null;
 let onSystemMessage = null;
+
+/**
+ * Get all available voices
+ * @returns {Array} Array of available voice objects
+ */
+function getAvailableVoices() {
+    return availableVoices.map(voice => ({
+        name: voice.name,
+        lang: voice.lang,
+        isDefault: voice.default,
+        localService: voice.localService
+    }));
+}
+
+/**
+ * Set the robot voice by name
+ * @param {string} voiceName - The name of the voice to use
+ */
+function setRobotVoice(voiceName) {
+    const voice = availableVoices.find(v => v.name === voiceName);
+    if (voice) {
+        robotVoice = voice;
+        console.log('Voice changed to:', voice.name);
+        updateVoiceSelector();
+    }
+}
+
+/**
+ * Update the voice selector UI
+ */
+function updateVoiceSelector() {
+    const voiceButton = document.getElementById('voiceButton');
+    if (voiceButton && robotVoice) {
+        // Show short name (remove vendor prefix if present)
+        const shortName = robotVoice.name.replace(/^(Microsoft|Google|Apple)\s*/, '').substring(0, 20);
+        voiceButton.title = `Current voice: ${robotVoice.name}`;
+    }
+}
+
+/**
+ * Toggle voice selector dropdown
+ */
+function toggleVoiceSelector() {
+    const dropdown = document.getElementById('voiceDropdown');
+    if (!dropdown) return;
+    
+    const isVisible = dropdown.style.display === 'block';
+    
+    if (isVisible) {
+        dropdown.style.display = 'none';
+    } else {
+        // Populate dropdown with voices
+        const voiceList = document.getElementById('voiceList');
+        if (voiceList) {
+            voiceList.innerHTML = '';
+            
+            // Group voices by language
+            const voicesByLang = {};
+            availableVoices.forEach(voice => {
+                const langCode = voice.lang.split('-')[0];
+                if (!voicesByLang[langCode]) {
+                    voicesByLang[langCode] = [];
+                }
+                voicesByLang[langCode].push(voice);
+            });
+            
+            // Create dropdown items
+            Object.keys(voicesByLang).sort().forEach(langCode => {
+                const langHeader = document.createElement('div');
+                langHeader.className = 'voice-lang-header';
+                langHeader.textContent = langCode.toUpperCase();
+                voiceList.appendChild(langHeader);
+                
+                voicesByLang[langCode].forEach(voice => {
+                    const voiceItem = document.createElement('div');
+                    voiceItem.className = 'voice-item';
+                    if (robotVoice && voice.name === robotVoice.name) {
+                        voiceItem.classList.add('selected');
+                    }
+                    
+                    voiceItem.innerHTML = `
+                        <span class="voice-name">${voice.name}</span>
+                        <span class="voice-lang">${voice.lang}</span>
+                    `;
+                    
+                    voiceItem.addEventListener('click', () => {
+                        setRobotVoice(voice.name);
+                        toggleVoiceSelector();
+                    });
+                    
+                    voiceList.appendChild(voiceItem);
+                });
+            });
+        }
+        
+        dropdown.style.display = 'block';
+    }
+}
 
 /**
  * Initialize speech synthesis
@@ -32,7 +131,7 @@ function initSpeechSynthesis() {
  * Select the best available robot voice
  */
 function selectRobotVoice() {
-    const voices = speechSynthesis.getVoices();
+    availableVoices = speechSynthesis.getVoices();
     
     // Prefer robot-like or synthetic voices
     const preferredVoices = [
@@ -46,13 +145,13 @@ function selectRobotVoice() {
     
     // Try to find a preferred voice
     for (const preferredVoice of preferredVoices) {
-        robotVoice = voices.find(voice => voice.name === preferredVoice);
+        robotVoice = availableVoices.find(voice => voice.name === preferredVoice);
         if (robotVoice) break;
     }
     
     // Fallback to any English male voice
     if (!robotVoice) {
-        robotVoice = voices.find(voice => 
+        robotVoice = availableVoices.find(voice => 
             voice.lang.startsWith('en') && 
             (voice.name.toLowerCase().includes('male') || voice.name.toLowerCase().includes('david') || voice.name.toLowerCase().includes('alex'))
         );
@@ -60,10 +159,11 @@ function selectRobotVoice() {
     
     // Final fallback to first English voice
     if (!robotVoice) {
-        robotVoice = voices.find(voice => voice.lang.startsWith('en')) || voices[0];
+        robotVoice = availableVoices.find(voice => voice.lang.startsWith('en')) || availableVoices[0];
     }
     
     console.log('Selected robot voice:', robotVoice ? robotVoice.name : 'Default');
+    updateVoiceSelector();
 }
 
 /**
@@ -336,6 +436,7 @@ function initAudioManager(callbacks = {}) {
 function setupAudioEventListeners() {
     const speechToggle = document.getElementById('speechToggle');
     const micButton = document.getElementById('micButton');
+    const voiceButton = document.getElementById('voiceButton');
     
     // Speech toggle event listener
     if (speechToggle) {
@@ -357,6 +458,28 @@ function setupAudioEventListeners() {
     } else {
         console.error('micButton not found');
     }
+    
+    // Voice selector button event listener
+    if (voiceButton) {
+        voiceButton.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleVoiceSelector();
+        });
+    } else {
+        console.error('voiceButton not found');
+    }
+    
+    // Close voice dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        const dropdown = document.getElementById('voiceDropdown');
+        const voiceButton = document.getElementById('voiceButton');
+        
+        if (dropdown && voiceButton && 
+            !dropdown.contains(e.target) && 
+            !voiceButton.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
 }
 
 /**
@@ -391,5 +514,8 @@ export {
     toggleSpeechRecognition,
     getAudioState,
     setSpeechEnabled,
-    updateMicButton
+    updateMicButton,
+    getAvailableVoices,
+    setRobotVoice,
+    toggleVoiceSelector
 };

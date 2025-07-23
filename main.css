@@ -129,7 +129,7 @@ a, button, input, select {
 	align-items: center;
 }
 
-#chatToggle, #speechToggle {
+#chatToggle, #speechToggle, #voiceButton {
 	background: none;
 	border: none;
 	color: white;
@@ -143,7 +143,7 @@ a, button, input, select {
 	justify-content: center;
 }
 
-#speechToggle {
+#speechToggle, #voiceButton {
 	font-size: 16px;
 	opacity: 1;
 	transition: opacity 0.3s;
@@ -151,6 +151,95 @@ a, button, input, select {
 
 #speechToggle.disabled {
 	opacity: 0.5;
+}
+
+/* Voice Selection Dropdown */
+#voiceDropdown {
+	position: absolute;
+	top: 50px;
+	right: 10px;
+	width: 300px;
+	max-height: 250px;
+	background: rgba(0, 0, 0, 0.95);
+	border: 1px solid #555;
+	border-radius: 8px;
+	z-index: 1001;
+	overflow: hidden;
+}
+
+.dropdown-header {
+	background: #444;
+	color: white;
+	padding: 10px 15px;
+	font-weight: bold;
+	border-bottom: 1px solid #555;
+}
+
+#voiceList {
+	max-height: 200px;
+	overflow-y: auto;
+	padding: 5px 0;
+}
+
+.voice-lang-header {
+	background: #333;
+	color: #ccc;
+	padding: 5px 15px;
+	font-size: 12px;
+	font-weight: bold;
+	text-transform: uppercase;
+	border-bottom: 1px solid #444;
+	margin: 5px 0;
+}
+
+.voice-item {
+	padding: 8px 15px;
+	cursor: pointer;
+	transition: background 0.2s;
+	border-bottom: 1px solid #333;
+}
+
+.voice-item:hover {
+	background: #c3bcbc;
+}
+
+.voice-item.selected {
+	background: #007bff;
+	color: white;
+}
+
+.voice-name {
+	display: block;
+	font-weight: bold;
+	margin-bottom: 2px;
+}
+
+.voice-lang {
+	display: block;
+	font-size: 12px;
+	color: #ccc;
+}
+
+.voice-item.selected .voice-lang {
+	color: #e0e0e0;
+}
+
+/* Scrollbar styling for voice list */
+#voiceList::-webkit-scrollbar {
+	width: 6px;
+}
+
+#voiceList::-webkit-scrollbar-track {
+	background: #222;
+}
+
+#voiceList::-webkit-scrollbar-thumb {
+	background: #555;
+	border-radius: 3px;
+}
+
+#voiceList::-webkit-scrollbar-thumb:hover {
+	background: #777;
 }
 
 #chatMessages {
