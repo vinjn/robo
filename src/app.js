@@ -41,6 +41,23 @@ let camera, scene, renderer, model, face;
 
 const api = { state: 'Idle', robotColor: '#ffffff' };
 
+// Load saved robot color from localStorage
+function loadRobotColor() {
+    const savedColor = localStorage.getItem('robotColor');
+    if (savedColor) {
+        api.robotColor = savedColor;
+        console.log('Loaded saved robot color:', savedColor);
+        return savedColor;
+    }
+    return '#ffffff'; // default white
+}
+
+// Save robot color to localStorage
+function saveRobotColor(color) {
+    localStorage.setItem('robotColor', color);
+    console.log('Saved robot color:', color);
+}
+
 // Timer variables
 let timerCallback;
 let states; // Make states accessible globally
@@ -122,6 +139,8 @@ async function initWebLLMWithUI() {
 init();
 
 function init() {
+    // Load saved robot color
+    api.robotColor = loadRobotColor();
 
     container = document.createElement( 'div' );
     document.body.appendChild( container );
@@ -232,6 +251,11 @@ function init() {
         if (!isWebLLMInitialized() && !isWebLLMInitializing()) {
             console.log('Auto-initializing WebLLM...');
             initWebLLMWithUI();
+        }
+        
+        // Show color restoration message if a custom color was loaded
+        if (api.robotColor !== '#ffffff') {
+            addMessage(`🎨 Restored your preferred robot color: ${api.robotColor}`, 'system');
         }
     }, 1000); // Wait 1 second after chat initialization
 
@@ -379,8 +403,14 @@ function createGUI( model, animations ) {
     colorFolder.addColor( api, 'robotColor' ).name( 'Color' ).onChange( function ( value ) {
         
         changeRobotColor( value );
+        saveRobotColor( value ); // Save the color preference
         
     } );
+    
+    // Apply saved color to the model when it's loaded
+    if (model) {
+        changeRobotColor(api.robotColor);
+    }
     
     colorFolder.open();
 

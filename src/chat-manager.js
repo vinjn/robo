@@ -414,6 +414,16 @@ function generatePatternResponse(userMessage) {
                 { text: "I can hear you too! Try using the microphone button to speak to me.", animation: 'Wave', expression: null }
             ]
         },
+        // Color-related interactions
+        {
+            patterns: ['color', 'paint', 'blue', 'red', 'green', 'yellow', 'purple', 'orange', 'pink', 'black', 'white'],
+            responses: [
+                { text: "I love colors! You can change my color in the Robot Color settings.", animation: 'ThumbsUp', expression: null },
+                { text: "Colors make me feel more expressive! Try different ones!", animation: 'Wave', expression: null },
+                { text: "I remember my color preference, so it stays the same when you reload!", animation: 'Yes', expression: null },
+                { text: "What's your favorite color? You can make me that color!", animation: 'Wave', expression: null }
+            ]
+        },
         // Dance requests
         {
             patterns: ['dance', 'move', 'show me moves'],
