@@ -8,7 +8,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 let container, stats, clock, gui, mixer, actions, activeAction, previousAction;
 let camera, scene, renderer, model, face;
 
-const api = { state: 'Idle' };
+const api = { state: 'Idle', robotColor: '#ffffff' };
 
 // Timer variables
 let timerCallback;
@@ -241,7 +241,7 @@ function createGUI( model, animations ) {
 
     for ( let i = 0; i < expressions.length; i ++ ) {
 
-        expressionFolder.add( face.morphTargetInfluences, i, 0, 1, 0.01 ).name( expressions[ i ] );
+        expressionFolder.add( face.morphTargetInfluences, i, -0.5, 1, 0.01 ).name( expressions[ i ] );
 
     }
 
@@ -250,6 +250,42 @@ function createGUI( model, animations ) {
 
     expressionFolder.open();
 
+    // robot color control
+    const colorFolder = gui.addFolder( 'Robot Color' );
+    
+    colorFolder.addColor( api, 'robotColor' ).name( 'Color' ).onChange( function ( value ) {
+        
+        changeRobotColor( value );
+        
+    } );
+    
+    colorFolder.open();
+
+}
+
+function changeRobotColor( color ) {
+    
+    if ( model ) {
+        
+        model.traverse( function ( child ) {
+            
+            if ( child.isMesh && child.material ) {
+                if ( child.material.name !== 'Main' ) 
+                    return; // Skip materials that are not the main one
+                
+                // Clone material to avoid affecting other objects
+                // console.log(child.material);
+                if ( child.material.color ) {
+                    child.material = child.material.clone();
+                    child.material.color.setHex( color.replace('#', '0x') );
+                }
+                
+            }
+            
+        } );
+        
+    }
+    
 }
 
 function fadeToAction( name, duration ) {
