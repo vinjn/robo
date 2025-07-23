@@ -26,6 +26,12 @@ import {
     setSpeechEnabled
 } from './audio-manager.js';
 
+// Import Storage manager
+import {
+    loadRobotColor,
+    saveRobotColor
+} from './storage-manager.js';
+
 // Import Chat manager
 import {
     initChat,
@@ -40,23 +46,6 @@ let container, stats, clock, gui, mixer, actions, activeAction, previousAction;
 let camera, scene, renderer, model, face;
 
 const api = { state: 'Idle', robotColor: '#ffffff' };
-
-// Load saved robot color from localStorage
-function loadRobotColor() {
-    const savedColor = localStorage.getItem('robotColor');
-    if (savedColor) {
-        api.robotColor = savedColor;
-        console.log('Loaded saved robot color:', savedColor);
-        return savedColor;
-    }
-    return '#ffffff'; // default white
-}
-
-// Save robot color to localStorage
-function saveRobotColor(color) {
-    localStorage.setItem('robotColor', color);
-    console.log('Saved robot color:', color);
-}
 
 // Timer variables
 let timerCallback;
@@ -140,7 +129,8 @@ init();
 
 function init() {
     // Load saved robot color
-    api.robotColor = loadRobotColor();
+    const savedColor = loadRobotColor();
+    api.robotColor = savedColor || '#ffffff'; // default white if no saved color
 
     container = document.createElement( 'div' );
     document.body.appendChild( container );

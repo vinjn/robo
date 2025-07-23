@@ -1,6 +1,12 @@
 // Audio Manager for Speech Synthesis and Recognition
 // Handles all audio-related functionality for the robot application
 
+// Import storage manager for persistence
+import {
+    saveVoicePreference,
+    loadVoicePreference
+} from './storage-manager.js';
+
 // Speech synthesis variables
 let speechSynthesis = window.speechSynthesis;
 let robotVoice = null;
@@ -39,6 +45,16 @@ function setRobotVoice(voiceName) {
     if (voice) {
         robotVoice = voice;
         console.log('Voice changed to:', voice.name);
+        
+        // Save voice preference using storage manager
+        saveVoicePreference(voice.name);
+        
+        // Provide user feedback
+        if (onSystemMessage) {
+            const shortName = voice.name.replace(/^(Microsoft|Google|Apple)\s*/, '');
+            onSystemMessage(`Voice changed to: ${shortName}`, 'system');
+        }
+        
         updateVoiceSelector();
     }
 }
@@ -52,6 +68,16 @@ function updateVoiceSelector() {
         // Show short name (remove vendor prefix if present)
         const shortName = robotVoice.name.replace(/^(Microsoft|Google|Apple)\s*/, '').substring(0, 20);
         voiceButton.title = `Current voice: ${robotVoice.name}`;
+        
+        // Update voice dropdown selection if it's open
+        const voiceItems = document.querySelectorAll('.voice-item');
+        voiceItems.forEach(item => {
+            item.classList.remove('selected');
+            const voiceName = item.querySelector('.voice-name')?.textContent;
+            if (voiceName === robotVoice.name) {
+                item.classList.add('selected');
+            }
+        });
     }
 }
 
@@ -132,6 +158,20 @@ function initSpeechSynthesis() {
  */
 function selectRobotVoice() {
     availableVoices = speechSynthesis.getVoices();
+    
+    // First try to load saved voice preference
+    const savedVoiceName = loadVoicePreference();
+    if (savedVoiceName) {
+        const savedVoice = availableVoices.find(voice => voice.name === savedVoiceName);
+        if (savedVoice) {
+            robotVoice = savedVoice;
+            console.log('Using saved voice preference:', savedVoice.name);
+            updateVoiceSelector();
+            return;
+        } else {
+            console.log('Saved voice not available, falling back to default selection');
+        }
+    }
     
     // Prefer robot-like or synthetic voices
     const preferredVoices = [
@@ -492,8 +532,17 @@ function getAudioState() {
         speechInitialized,
         isListening,
         recognitionSupported,
-        hasRobotVoice: !!robotVoice
+        hasRobotVoice: !!robotVoice,
+        currentVoiceName: robotVoice ? robotVoice.name : null
     };
+}
+
+/**
+ * Get the current voice name
+ * @returns {string|null} The current voice name or null if not set
+ */
+function getCurrentVoiceName() {
+    return robotVoice ? robotVoice.name : null;
 }
 
 /**
@@ -517,5 +566,6 @@ export {
     updateMicButton,
     getAvailableVoices,
     setRobotVoice,
-    toggleVoiceSelector
+    toggleVoiceSelector,
+    getCurrentVoiceName
 };
