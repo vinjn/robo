@@ -17,7 +17,7 @@ let chatHistory = [];
 let conversationContext = []; // For LLM context
 
 // LLM configuration
-let llmProvider = 'pattern'; // 'pattern', 'openai', 'ollama', 'webllm'
+let llmProvider = 'webllm'; // 'pattern', 'openai', 'ollama', 'webllm' - default to webllm
 let llmConfig = {
     openai: {
         apiKey: '', // Set your API key here

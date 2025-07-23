@@ -227,6 +227,14 @@ function init() {
         onRobotExpression: triggerRobotExpression
     });
 
+    // Auto-initialize WebLLM by default
+    setTimeout(() => {
+        if (!isWebLLMInitialized() && !isWebLLMInitializing()) {
+            console.log('Auto-initializing WebLLM...');
+            initWebLLMWithUI();
+        }
+    }, 1000); // Wait 1 second after chat initialization
+
 }
 
 function setupTimer() {
