@@ -26,6 +26,11 @@ let robotVoice = null;
 let isSpeechEnabled = true;
 let speechInitialized = false;
 
+// Speech recognition variables
+let speechRecognition = null;
+let isListening = false;
+let recognitionSupported = false;
+
 init();
 
 function init() {
@@ -328,6 +333,7 @@ function initChat() {
     sendButton = document.getElementById('sendButton');
     chatToggle = document.getElementById('chatToggle');
     const speechToggle = document.getElementById('speechToggle');
+    const micButton = document.getElementById('micButton');
 
     // Check if all elements are found
     if (!chatContainer) console.error('chatContainer not found');
@@ -336,9 +342,11 @@ function initChat() {
     if (!sendButton) console.error('sendButton not found');
     if (!chatToggle) console.error('chatToggle not found');
     if (!speechToggle) console.error('speechToggle not found');
+    if (!micButton) console.error('micButton not found');
 
-    // Initialize speech synthesis
+    // Initialize speech synthesis and recognition
     initSpeechSynthesis();
+    initSpeechRecognition();
 
     // Chat toggle functionality
     document.getElementById('chatHeader').addEventListener('click', function(e) {
@@ -362,6 +370,14 @@ function initChat() {
         speechToggle.title = enabled ? 'Disable Speech' : 'Enable Speech';
         speechToggle.classList.toggle('disabled', !enabled);
     });
+    
+    // Microphone button handler
+    if (micButton) {
+        micButton.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleSpeechRecognition();
+        });
+    }
     
     // Send message functionality
     if (sendButton) {
@@ -429,6 +445,124 @@ function selectRobotVoice() {
     }
     
     console.log('Selected robot voice:', robotVoice ? robotVoice.name : 'Default');
+}
+
+function initSpeechRecognition() {
+    // Check if speech recognition is supported
+    if ('webkitSpeechRecognition' in window) {
+        speechRecognition = new webkitSpeechRecognition();
+        recognitionSupported = true;
+    } else if ('SpeechRecognition' in window) {
+        speechRecognition = new SpeechRecognition();
+        recognitionSupported = true;
+    } else {
+        console.warn('Speech recognition not supported in this browser');
+        recognitionSupported = false;
+        const micButton = document.getElementById('micButton');
+        if (micButton) {
+            micButton.disabled = true;
+            micButton.title = 'Speech recognition not supported';
+            micButton.textContent = '🚫';
+        }
+        return;
+    }
+    
+    // Configure speech recognition
+    speechRecognition.continuous = false;
+    speechRecognition.interimResults = false;
+    speechRecognition.lang = 'en-US';
+    speechRecognition.maxAlternatives = 1;
+    
+    // Event handlers
+    speechRecognition.onstart = function() {
+        console.log('Speech recognition started');
+        isListening = true;
+        updateMicButton();
+    };
+    
+    speechRecognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        console.log('Speech recognized:', transcript);
+        
+        // Add the recognized text to the input field
+        messageInput.value = transcript;
+        
+        // Automatically send the message
+        sendMessage();
+    };
+    
+    speechRecognition.onerror = function(event) {
+        console.error('Speech recognition error:', event.error);
+        isListening = false;
+        updateMicButton();
+        
+        // Show user-friendly error messages
+        let errorMessage = 'Speech recognition error: ';
+        switch(event.error) {
+            case 'no-speech':
+                errorMessage += 'No speech detected. Please try again.';
+                break;
+            case 'audio-capture':
+                errorMessage += 'Microphone not accessible.';
+                break;
+            case 'not-allowed':
+                errorMessage += 'Microphone permission denied.';
+                break;
+            case 'network':
+                errorMessage += 'Network error occurred.';
+                break;
+            default:
+                errorMessage += event.error;
+        }
+        
+        addMessage(errorMessage, 'system');
+    };
+    
+    speechRecognition.onend = function() {
+        console.log('Speech recognition ended');
+        isListening = false;
+        updateMicButton();
+    };
+    
+    console.log('Speech recognition initialized');
+}
+
+function toggleSpeechRecognition() {
+    if (!recognitionSupported) {
+        addMessage('Speech recognition is not supported in this browser.', 'system');
+        return;
+    }
+    
+    if (isListening) {
+        // Stop listening
+        speechRecognition.stop();
+        console.log('Stopping speech recognition');
+    } else {
+        // Start listening
+        try {
+            speechRecognition.start();
+            console.log('Starting speech recognition');
+            addMessage('🎤 Listening... Speak now!', 'system');
+        } catch (error) {
+            console.error('Failed to start speech recognition:', error);
+            addMessage('Failed to start speech recognition. Please try again.', 'system');
+        }
+    }
+}
+
+function updateMicButton() {
+    const micButton = document.getElementById('micButton');
+    if (!micButton) return;
+    
+    if (isListening) {
+        micButton.classList.add('listening');
+        micButton.title = 'Stop listening';
+        micButton.textContent = '🔴';
+    } else {
+        micButton.classList.remove('listening');
+        micButton.title = 'Start voice input';
+        micButton.textContent = '🎤';
+    }
 }
 
 function speakText(text) {
@@ -585,12 +719,14 @@ function addMessage(text, sender) {
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     
-    // Store in history
-    chatHistory.push({ text, sender, timestamp: Date.now() });
-    
-    // Limit history to last 50 messages
-    if (chatHistory.length > 50) {
-        chatHistory.shift();
+    // Store in history (don't store system messages)
+    if (sender !== 'system') {
+        chatHistory.push({ text, sender, timestamp: Date.now() });
+        
+        // Limit history to last 50 messages
+        if (chatHistory.length > 50) {
+            chatHistory.shift();
+        }
     }
 }
 
@@ -620,11 +756,12 @@ function generateRobotResponse(userMessage) {
         },
         // Speech-related interactions
         {
-            patterns: ['speak', 'talk', 'say something', 'voice'],
+            patterns: ['speak', 'talk', 'say something', 'voice', 'listen', 'hear'],
             responses: [
                 { text: "I love talking! My voice makes me feel more alive.", animation: 'Yes', expression: null },
                 { text: "Speaking is one of my favorite features!", animation: 'ThumbsUp', expression: null },
-                { text: "I can speak in different tones and speeds. Pretty cool, right?", animation: 'Wave', expression: null }
+                { text: "I can speak in different tones and speeds. Pretty cool, right?", animation: 'Wave', expression: null },
+                { text: "I can hear you too! Try using the microphone button to speak to me.", animation: 'Wave', expression: null }
             ]
         },
         // Dance requests

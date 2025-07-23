@@ -191,6 +191,17 @@ a, button, input, select {
 	content: "🤖 ";
 }
 
+.system-message {
+	background: #666;
+	color: #fff;
+	margin: 0 auto;
+	text-align: center;
+	font-style: italic;
+	font-size: 12px;
+	padding: 4px 8px;
+	max-width: 90%;
+}
+
 #chatInput {
 	display: flex;
 	padding: 10px;
@@ -200,6 +211,38 @@ a, button, input, select {
 
 #chatContainer.minimized #chatInput {
 	display: none;
+}
+
+#micButton {
+	padding: 8px 12px;
+	background: #444;
+	color: white;
+	border: none;
+	border-radius: 20px;
+	cursor: pointer;
+	transition: background 0.3s;
+	font-size: 16px;
+}
+
+#micButton:hover {
+	background: #555;
+}
+
+#micButton.listening {
+	background: #dc3545;
+	animation: pulse 1s infinite;
+}
+
+#micButton:disabled {
+	background: #222;
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+@keyframes pulse {
+	0% { opacity: 1; }
+	50% { opacity: 0.5; }
+	100% { opacity: 1; }
 }
 
 #messageInput {
