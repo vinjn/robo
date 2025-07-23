@@ -5,6 +5,17 @@ import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+// Import WebLLM manager
+import {
+    initWebLLM,
+    generateWebLLMResponse,
+    isWebLLMInitialized,
+    isWebLLMInitializing,
+    getWebLLMConfig,
+    setWebLLMModel,
+    resetWebLLM
+} from './webllm-manager.js';
+
 let container, stats, clock, gui, mixer, actions, activeAction, previousAction;
 let camera, scene, renderer, model, face;
 
@@ -19,6 +30,7 @@ let expressions; // Make expressions accessible globally
 // Chat system variables
 let chatContainer, chatMessages, messageInput, sendButton, chatToggle;
 let chatHistory = [];
+let conversationContext = []; // For LLM context
 
 // Speech synthesis variables
 let speechSynthesis = window.speechSynthesis;
@@ -30,6 +42,92 @@ let speechInitialized = false;
 let speechRecognition = null;
 let isListening = false;
 let recognitionSupported = false;
+
+// LLM inference variables
+let llmProvider = 'pattern'; // 'pattern', 'openai', 'ollama', 'webllm'
+let llmConfig = {
+    openai: {
+        apiKey: '', // Set your API key here
+        model: 'gpt-3.5-turbo',
+        endpoint: 'https://api.openai.com/v1/chat/completions'
+    },
+    ollama: {
+        endpoint: 'http://localhost:11434/api/generate',
+        model: 'llama2'
+    }
+};
+
+async function initWebLLMWithUI() {
+    // Update status
+    if (window.webllmControls) {
+        window.webllmControls.status = 'Checking GPU...';
+    }
+    
+    // Add system message about initialization
+    const progressMessage = addMessage('🤖 Initializing WebLLM... Checking GPU capabilities...', 'system');
+    
+    const progressCallback = (statusText, percentage) => {
+        // Update status in GUI
+        if (window.webllmControls) {
+            window.webllmControls.status = statusText;
+        }
+        
+        // Update progress message in chat
+        if (progressMessage) {
+            if (percentage !== undefined) {
+                progressMessage.textContent = `🤖 ${statusText}`;
+            } else {
+                progressMessage.textContent = `🤖 ${statusText}`;
+            }
+        }
+    };
+    
+    const messageCallback = (message, type) => {
+        addMessage(message, type);
+    };
+    
+    const result = await initWebLLM(progressCallback, messageCallback);
+    
+    if (result.success) {
+        const gpuInfo = result.gpuInfo;
+        
+        // Update status
+        if (window.webllmControls) {
+            window.webllmControls.status = gpuInfo.supported ? 'Ready (GPU)' : 'Ready (CPU)';
+        }
+        
+        // Update progress message to show completion
+        if (progressMessage) {
+            const gpuStatus = gpuInfo.supported ? '🚀 GPU-accelerated' : '🖥️ CPU-based';
+            progressMessage.textContent = `✅ WebLLM initialized! ${gpuStatus} AI ready for chat.`;
+            progressMessage.className = 'message system-message success';
+        }
+        
+        // Show GPU info
+        if (gpuInfo.supported && gpuInfo.adapter) {
+            const gpuName = `${gpuInfo.adapter.vendor || 'Unknown'} ${gpuInfo.adapter.device || 'GPU'}`;
+            const typeInfo = gpuInfo.selectedType ? ` (${gpuInfo.selectedType})` : '';
+            const adapterInfo = gpuInfo.totalAdapters > 1 ? ` [${gpuInfo.totalAdapters} adapters found]` : '';
+            
+            console.log('GPU Info:', gpuName + typeInfo + adapterInfo);
+            addMessage(`🎯 Using GPU: ${gpuName}${typeInfo}${adapterInfo}`, 'system');
+        } else if (!gpuInfo.supported) {
+            console.warn('⚠️ GPU not available:', gpuInfo.reason);
+            addMessage(`⚠️ GPU unavailable: ${gpuInfo.reason}. Using CPU mode.`, 'system');
+        }
+    } else {
+        // Update status
+        if (window.webllmControls) {
+            window.webllmControls.status = 'Failed to initialize';
+        }
+        
+        // Update progress message to show error
+        if (progressMessage) {
+            progressMessage.textContent = '❌ Failed to initialize WebLLM. Please try again or use a different model.';
+            progressMessage.className = 'message system-message error';
+        }
+    }
+}
 
 init();
 
@@ -278,6 +376,60 @@ function createGUI( model, animations ) {
     } );
     
     colorFolder.open();
+
+    // LLM settings
+    const llmFolder = gui.addFolder( 'LLM Settings' );
+    
+    const llmProviderCtrl = llmFolder.add( { provider: llmProvider }, 'provider', ['pattern', 'webllm', 'openai', 'ollama' ] );
+    llmProviderCtrl.onChange( function ( value ) {
+        llmProvider = value;
+        console.log('LLM provider changed to:', value);
+        
+        // Initialize WebLLM when selected
+        if (value === 'webllm' && !isWebLLMInitialized() && !isWebLLMInitializing()) {
+            initWebLLMWithUI();
+        }
+    } );
+    
+    llmFolder.add( llmConfig.openai, 'apiKey' ).name( 'OpenAI API Key' );
+    llmFolder.add( llmConfig.openai, 'model' ).name( 'OpenAI Model' );
+    llmFolder.add( llmConfig.ollama, 'endpoint' ).name( 'Ollama Endpoint' );
+    llmFolder.add( llmConfig.ollama, 'model' ).name( 'Ollama Model' );
+    
+    // WebLLM controls
+    const webLLMConfig = getWebLLMConfig();
+    const webllmModelCtrl = llmFolder.add( webLLMConfig, 'model', webLLMConfig.availableModels ).name( 'WebLLM Model' );
+    webllmModelCtrl.onChange( function ( value ) {
+        setWebLLMModel(value);
+        console.log('WebLLM model changed to:', value);
+        // Reinitialize if already initialized
+        if (isWebLLMInitialized()) {
+            resetWebLLM();
+            if (llmProvider === 'webllm') {
+                initWebLLMWithUI();
+            }
+        }
+    } );
+    
+    // Add WebLLM initialization button
+    const webllmControls = {
+        initWebLLM: function() {
+            if (!isWebLLMInitialized() && !isWebLLMInitializing()) {
+                initWebLLMWithUI();
+            }
+        },
+        status: 'Not initialized'
+    };
+    
+    llmFolder.add( webllmControls, 'initWebLLM' ).name( 'Initialize WebLLM' );
+    const statusController = llmFolder.add( webllmControls, 'status' ).name( 'WebLLM Status' );
+    statusController.listen(); // Make it update automatically
+    
+    // Store reference for updates
+    window.webllmStatusController = statusController;
+    window.webllmControls = webllmControls;
+    
+    // llmFolder.open();
 
 }
 
@@ -690,23 +842,74 @@ function sendMessage() {
     // Add user message
     addMessage(message, 'user');
     
+    // Add to conversation context for LLM
+    conversationContext.push({ role: 'user', content: message });
+    
     // Clear input
     messageInput.value = '';
     
     // Generate robot response
-    setTimeout(() => {
-        const response = generateRobotResponse(message);
-        addMessage(response.text, 'robot');
-        
-        // Speak the robot's response
-        speakText(response.text);
-        
-        // Trigger robot animation/expression based on response
-        if (response.animation) {
-            triggerRobotAction(response.animation);
+    setTimeout(async () => {
+        // Show thinking indicator for LLM providers
+        let thinkingMessage = null;
+        if (llmProvider !== 'pattern') {
+            thinkingMessage = addMessage('🤔 Thinking...', 'system');
         }
-        if (response.expression) {
-            triggerRobotExpression(response.expression);
+        
+        // Check if WebLLM needs initialization
+        if (llmProvider === 'webllm' && !isWebLLMInitialized() && !isWebLLMInitializing()) {
+            if (thinkingMessage) {
+                thinkingMessage.remove();
+            }
+            addMessage('WebLLM not initialized. Please initialize it in the LLM Settings first.', 'system');
+            return;
+        }
+        
+        try {
+            const response = await generateRobotResponse(message);
+            
+            // Remove thinking indicator
+            if (thinkingMessage) {
+                thinkingMessage.remove();
+            }
+            
+            addMessage(response.text, 'robot');
+            
+            // Add robot response to conversation context
+            conversationContext.push({ role: 'assistant', content: response.text });
+            
+            // Limit conversation context to last 10 exchanges (20 messages)
+            if (conversationContext.length > 20) {
+                conversationContext = conversationContext.slice(-20);
+            }
+            
+            // Speak the robot's response
+            speakText(response.text);
+            
+            // Trigger robot animation/expression based on response
+            if (response.animation) {
+                triggerRobotAction(response.animation);
+            }
+            if (response.expression) {
+                triggerRobotExpression(response.expression);
+            }
+        } catch (error) {
+            // Remove thinking indicator
+            if (thinkingMessage) {
+                thinkingMessage.remove();
+            }
+            
+            console.error('Failed to generate response:', error);
+            addMessage('Sorry, I had trouble generating a response. Using fallback mode.', 'system');
+            
+            // Fallback to pattern-based response
+            const fallbackResponse = generatePatternResponse(message);
+            addMessage(fallbackResponse.text, 'robot');
+            speakText(fallbackResponse.text);
+            
+            if (fallbackResponse.animation) {
+                triggerRobotAction(fallbackResponse.animation);
+            }
         }
     }, 500 + Math.random() * 1000); // Random delay for more natural feel
 }
@@ -728,9 +931,133 @@ function addMessage(text, sender) {
             chatHistory.shift();
         }
     }
+    
+    return messageDiv; // Return the element for potential removal
 }
 
-function generateRobotResponse(userMessage) {
+async function generateRobotResponse(userMessage) {
+    console.log(`Generating response using ${llmProvider} provider`);
+    
+    try {
+        switch (llmProvider) {
+            case 'openai':
+                return await generateOpenAIResponse(userMessage);
+            case 'ollama':
+                return await generateOllamaResponse(userMessage);
+            case 'webllm':
+                return await generateWebLLMResponse(userMessage);
+            case 'pattern':
+            default:
+                return generatePatternResponse(userMessage);
+        }
+    } catch (error) {
+        console.error('LLM generation failed:', error);
+        // Fallback to pattern-based responses
+        return generatePatternResponse(userMessage);
+    }
+}
+
+async function generateOpenAIResponse(userMessage) {
+    if (!llmConfig.openai.apiKey) {
+        throw new Error('OpenAI API key not configured');
+    }
+    
+    const systemPrompt = `You are a friendly, expressive robot named Robo. You can perform animations like Wave, Yes, No, ThumbsUp, and Punch. You love to move, dance, and interact with humans. Keep responses conversational, enthusiastic, and under 100 words. Sometimes suggest animations you can do. You have text-to-speech capabilities and can hear users through speech recognition.`;
+    
+    // Build conversation messages with context
+    const messages = [
+        { role: 'system', content: systemPrompt },
+        ...conversationContext.slice(-10), // Last 5 exchanges
+        { role: 'user', content: userMessage }
+    ];
+    
+    const response = await fetch(llmConfig.openai.endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${llmConfig.openai.apiKey}`
+        },
+        body: JSON.stringify({
+            model: llmConfig.openai.model,
+            messages: messages,
+            max_tokens: 150,
+            temperature: 0.7
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const text = data.choices[0].message.content.trim();
+    
+    return {
+        text: text,
+        animation: extractAnimationFromText(text),
+        expression: null
+    };
+}
+
+async function generateOllamaResponse(userMessage) {
+    const systemPrompt = `You are Robo, a friendly robot assistant. You can perform animations: Wave, Yes, No, ThumbsUp, Punch. Be enthusiastic and conversational. Keep responses under 100 words.`;
+    
+    const response = await fetch(llmConfig.ollama.endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: llmConfig.ollama.model,
+            prompt: `${systemPrompt}\n\nHuman: ${userMessage}\n\nRobo:`,
+            stream: false
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Ollama API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const text = data.response.trim();
+    
+    return {
+        text: text,
+        animation: extractAnimationFromText(text),
+        expression: null
+    };
+}
+
+function extractAnimationFromText(text) {
+    const animations = ['Wave', 'Yes', 'No', 'ThumbsUp', 'Punch'];
+    const lowerText = text.toLowerCase();
+    
+    // Look for animation keywords in the text
+    if (lowerText.includes('wave') || lowerText.includes('hello') || lowerText.includes('hi')) {
+        return 'Wave';
+    }
+    if (lowerText.includes('yes') || lowerText.includes('agree') || lowerText.includes('correct')) {
+        return 'Yes';
+    }
+    if (lowerText.includes('no') || lowerText.includes('disagree') || lowerText.includes('wrong')) {
+        return 'No';
+    }
+    if (lowerText.includes('thumbs') || lowerText.includes('good') || lowerText.includes('great') || lowerText.includes('awesome')) {
+        return 'ThumbsUp';
+    }
+    if (lowerText.includes('punch') || lowerText.includes('power') || lowerText.includes('strong') || lowerText.includes('energy')) {
+        return 'Punch';
+    }
+    
+    // Random animation for variety
+    if (Math.random() < 0.3) {
+        return animations[Math.floor(Math.random() * animations.length)];
+    }
+    
+    return null;
+}
+
+function generatePatternResponse(userMessage) {
     const message = userMessage.toLowerCase();
     
     // Define response patterns

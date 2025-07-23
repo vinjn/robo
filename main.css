@@ -94,7 +94,7 @@ a, button, input, select {
 #chatContainer {
 	position: fixed;
 	bottom: 20px;
-	right: 20px;
+	left: 20px;
 	width: 350px;
 	height: 400px;
 	background: rgba(0, 0, 0, 0.9);
@@ -200,6 +200,19 @@ a, button, input, select {
 	font-size: 12px;
 	padding: 4px 8px;
 	max-width: 90%;
+	transition: all 0.3s ease;
+}
+
+.system-message.success {
+	background: #2d5a2d;
+	color: #90ee90;
+	border: 1px solid #4a7c4a;
+}
+
+.system-message.error {
+	background: #5a2d2d;
+	color: #ffb3b3;
+	border: 1px solid #7c4a4a;
 }
 
 #chatInput {
@@ -300,7 +313,7 @@ a, button, input, select {
 @media all and (max-width: 640px) {
 	#chatContainer {
 		width: calc(100% - 40px);
-		right: 20px;
 		left: 20px;
+		right: 20px;
 	}
 }
