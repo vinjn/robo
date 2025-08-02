@@ -45,6 +45,11 @@ import {
 let container, stats, clock, gui, mixer, actions, activeAction, previousAction;
 let camera, scene, renderer, model, face;
 
+// FPS limiting variables
+let lastFrameTime = 0;
+const targetFPS = 60;
+const frameInterval = 1000 / targetFPS; // ~16.67ms for 60 FPS
+
 const api = { state: 'Idle', robotColor: '#f5a824' };
 
 // Timer variables
@@ -551,7 +556,12 @@ function onWindowResize() {
 
 //
 
-function animate() {
+function animate(currentTime) {
+
+    // FPS limiting: only render if enough time has passed
+    if (currentTime - lastFrameTime < frameInterval) {
+        return;
+    }
 
     const dt = clock.getDelta();
 
@@ -560,5 +570,8 @@ function animate() {
     renderer.render( scene, camera );
 
     stats.update();
+
+    // Update last frame time
+    lastFrameTime = currentTime;
 
 }
