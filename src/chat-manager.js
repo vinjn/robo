@@ -26,7 +26,16 @@ let llmConfig = {
     },
     ollama: {
         endpoint: 'http://localhost:11434/api/generate',
-        model: 'llama2'
+        model: 'gemma3:4b',
+        availableModels: [
+            'gpt-oss:120b',
+            'gpt-oss:20b', 
+            'gemma3:4b',
+            'gemma2:1b',
+            'gemma2:12b',
+            'gemma2:27b',
+            'deepseek-r1:8b',
+        ]
     }
 };
 

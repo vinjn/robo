@@ -241,19 +241,6 @@ function init() {
         onRobotExpression: triggerRobotExpression
     });
 
-    // Auto-initialize WebLLM by default
-    setTimeout(() => {
-        if (!isWebLLMInitialized() && !isWebLLMInitializing()) {
-            console.log('Auto-initializing WebLLM...');
-            initWebLLMWithUI();
-        }
-        
-        // Show color restoration message if a custom color was loaded
-        if (api.robotColor !== '#ffffff') {
-            addMessage(`🎨 Restored your preferred robot color: ${api.robotColor}`, 'system');
-        }
-    }, 1000); // Wait 1 second after chat initialization
-
 }
 
 function setupTimer() {
@@ -415,7 +402,7 @@ function createGUI( model, animations ) {
     // Get current LLM configuration from chat manager
     const currentLLMConfig = getLLMConfig();
     
-    const llmProviderCtrl = llmFolder.add( { provider: currentLLMConfig.provider }, 'provider', ['pattern', 'webllm', 'openai', 'ollama' ] );
+    const llmProviderCtrl = llmFolder.add( { provider: currentLLMConfig.provider }, 'pattern', ['pattern', 'webllm', 'openai', 'ollama' ] );
     llmProviderCtrl.onChange( function ( value ) {
         setLLMProvider(value);
         
@@ -428,8 +415,14 @@ function createGUI( model, animations ) {
     llmFolder.add( currentLLMConfig.config.openai, 'apiKey' ).name( 'OpenAI API Key' );
     llmFolder.add( currentLLMConfig.config.openai, 'model' ).name( 'OpenAI Model' );
     llmFolder.add( currentLLMConfig.config.ollama, 'endpoint' ).name( 'Ollama Endpoint' );
-    llmFolder.add( currentLLMConfig.config.ollama, 'model' ).name( 'Ollama Model' );
     
+    // Ollama model dropdown with available models
+    const ollamaModelCtrl = llmFolder.add( currentLLMConfig.config.ollama, 'model', currentLLMConfig.config.ollama.availableModels ).name( 'Ollama Model' );
+    ollamaModelCtrl.onChange( function ( value ) {
+        currentLLMConfig.config.ollama.model = value;
+        console.log('Ollama model changed to:', value);
+    } );
+
     // WebLLM controls
     const webLLMConfig = getWebLLMConfig();
     const webllmModelCtrl = llmFolder.add( webLLMConfig, 'model', webLLMConfig.availableModels ).name( 'WebLLM Model' );
