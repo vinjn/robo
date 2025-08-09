@@ -42,6 +42,13 @@ import {
     updateLLMConfig
 } from './chat-manager.js';
 
+// Import Ollama manager
+import {
+    getAvailableOllamaModels,
+    getCurrentOllamaModel,
+    setOllamaModel
+} from './ollama-manager.js';
+
 let container, stats, clock, gui, mixer, actions, activeAction, previousAction;
 let camera, scene, renderer, model, face;
 

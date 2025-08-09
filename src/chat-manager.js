@@ -11,6 +11,16 @@ import {
     isWebLLMInitializing 
 } from './webllm-manager.js';
 
+// Import Ollama manager
+import {
+    generateOllamaResponse,
+    getAvailableOllamaModels,
+    setOllamaModel,
+    getCurrentOllamaModel,
+    getOllamaConfig,
+    updateOllamaConfig
+} from './ollama-manager.js';
+
 // Chat system variables
 let chatContainer, chatMessages, messageInput, sendButton, chatToggle;
 let chatHistory = [];
@@ -23,19 +33,6 @@ let llmConfig = {
         apiKey: '', // Set your API key here
         model: 'gpt-3.5-turbo',
         endpoint: 'https://api.openai.com/v1/chat/completions'
-    },
-    ollama: {
-        endpoint: 'http://localhost:11434/api/generate',
-        model: 'gemma3:4b',
-        availableModels: [
-            'gpt-oss:120b',
-            'gpt-oss:20b', 
-            'gemma3:4b',
-            'gemma2:1b',
-            'gemma2:12b',
-            'gemma2:27b',
-            'deepseek-r1:8b',
-        ]
     }
 };
 
@@ -310,7 +307,7 @@ async function generateRobotResponse(userMessage) {
             case 'openai':
                 return await generateOpenAIResponse(userMessage);
             case 'ollama':
-                return await generateOllamaResponse(userMessage);
+                return await generateOllamaResponse(userMessage, conversationContext);
             case 'webllm':
                 return await generateWebLLMResponse(userMessage);
             case 'pattern':
@@ -363,40 +360,6 @@ async function generateOpenAIResponse(userMessage) {
     
     const data = await response.json();
     const text = data.choices[0].message.content.trim();
-    
-    return {
-        text: text,
-        animation: extractAnimationFromText(text),
-        expression: null
-    };
-}
-
-/**
- * Generate response using Ollama API
- * @param {string} userMessage - The user's message
- * @returns {Object} Response object
- */
-async function generateOllamaResponse(userMessage) {
-    const systemPrompt = `You are Robo, a friendly robot assistant. You can perform animations: Wave, Yes, No, ThumbsUp, Punch. Be enthusiastic and conversational. Keep responses under 100 words.`;
-    
-    const response = await fetch(llmConfig.ollama.endpoint, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            model: llmConfig.ollama.model,
-            prompt: `${systemPrompt}\n\nHuman: ${userMessage}\n\nRobo:`,
-            stream: false
-        })
-    });
-    
-    if (!response.ok) {
-        throw new Error(`Ollama API error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    const text = data.response.trim();
     
     return {
         text: text,
@@ -573,7 +536,10 @@ function setLLMProvider(provider) {
 function getLLMConfig() {
     return {
         provider: llmProvider,
-        config: llmConfig
+        config: {
+            ...llmConfig,
+            ollama: getOllamaConfig()
+        }
     };
 }
 
@@ -586,7 +552,7 @@ function updateLLMConfig(newConfig) {
         llmConfig.openai = { ...llmConfig.openai, ...newConfig.openai };
     }
     if (newConfig.ollama) {
-        llmConfig.ollama = { ...llmConfig.ollama, ...newConfig.ollama };
+        updateOllamaConfig(newConfig.ollama);
     }
 }
 
@@ -642,5 +608,9 @@ export {
     getChatHistory,
     getConversationContext,
     clearChat,
-    generatePatternResponse
+    generatePatternResponse,
+    // Re-export Ollama functions for compatibility
+    getAvailableOllamaModels,
+    setOllamaModel,
+    getCurrentOllamaModel
 };
